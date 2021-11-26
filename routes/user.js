@@ -4,6 +4,10 @@ const SHA256 = require("crypto-js/sha256");
 const encBase64 = require("crypto-js/enc-base64");
 const uid2 = require("uid2");
 const router = express.Router();
+const cloudinary = require("cloudinary").v2;
+
+//Importing middlewares
+const userAuthenticated = require("../middlewares/userAuthenticated");
 
 //Importing models
 const User = require("../models/User");
@@ -27,9 +31,11 @@ router.post("/user/signup", async (req, res) => {
     const token = uid2(16);
     const newUser = new User({
       email: email,
-      username: username,
-      name: name,
-      description: description,
+      account: {
+        username: username,
+        name: name,
+        description: description,
+      },
       hash: hash,
       salt: salt,
       token: token,
@@ -66,12 +72,59 @@ router.post("/user/login/", async (req, res) => {
           _id: userFound.id,
           token: userFound.token,
           email: userFound.email,
-          username: userFound.username,
-          description: userFound.description,
-          name: userFound.name,
+          username: userFound.account.username,
+          description: userFound.account.description,
+          name: userFound.account.name,
         });
       }
     }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.put("/user/upload_picture/:id", userAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    const result = await cloudinary.uploader.upload(req.files.picture.path, {
+      folder: `/airbnb/users/${user.id}`,
+    });
+    user.account.photo.url = result.secure_url;
+    user.account.photo.picture_id = result.public_id;
+    await user.save();
+    res.status(200).json({
+      account: user.account,
+      _id: user.id,
+      email: user.email,
+      rooms: user.rooms,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+router.delete(
+  "/user/delete_picture/:id",
+  userAuthenticated,
+  async (req, res) => {
+    try {
+      //Not sure how to delete with picture_id
+      //So I've deleted with public_id and destroy method
+      const user = await User.findById(req.params.id);
+      await cloudinary.uploader.destroy(user.account.photo.picture_id);
+      user.account.photo = {};
+      await user.save();
+      res.status(200).json({ message: "Photo deleted" });
+    } catch (error) {
+      res.status(400).json({ error: error.message });
+    }
+  }
+);
+
+router.get("/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("id account rooms");
+    res.status(200).json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }

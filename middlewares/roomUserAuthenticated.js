@@ -2,7 +2,7 @@
 const User = require("../models/User");
 const Room = require("../models/Room");
 
-const isOwnerAuthenticated = async (req, res, next) => {
+const roomUserAuthenticated = async (req, res, next) => {
   const token = req.headers.authorization.replace("Bearer ", "");
   if (req.params.id) {
     const roomToUpdate = await Room.findById(req.params.id).populate({
@@ -25,4 +25,4 @@ const isOwnerAuthenticated = async (req, res, next) => {
   }
 };
 
-module.exports = isOwnerAuthenticated;
+module.exports = roomUserAuthenticated;
